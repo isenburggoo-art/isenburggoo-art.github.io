@@ -1,0 +1,97 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Disclosure from '../../components/Disclosure.astro';
+import ProductList from '../../components/ProductList.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import { productsForArticle, buyUrl, formatDate, isoDate } from '../../lib.mjs';
+import { categoryByKey } from '../../data/categories.mjs';
+import { SITE_NAME } from '../../site.config.mjs';
+
+export async function getStaticPaths() {
+  const all = await getCollection('articles', ({ data }) => !data.draft);
+  return all.map((entry) => ({ params: { slug: entry.id }, props: { entry, all } }));
+}
+const { entry, all } = Astro.props;
+const { data } = entry;
+const products = productsForArticle(entry.id);
+const cat = categoryByKey(data.category);
+const url = new URL(Astro.url.pathname, Astro.site).href;
+
+// 본문 HTML: 표를 가로 스크롤 래퍼로 감싸고, <!-- products --> 위치에 추천 상품 삽입
+const html = (entry.rendered?.html ?? '')
+  .replaceAll('<table>', '<div class="table-wrap"><table>')
+  .replaceAll('</table>', '</table></div>');
+const MARK = '<!-- products -->';
+const [before, after] = html.includes(MARK) ? html.split(MARK) : [html, ''];
+const headings = (entry.rendered?.metadata?.headings ?? []).filter((h) => h.depth === 2);
+
+// 함께 읽을 글: frontmatter related 우선, 부족하면 같은 카테고리/나머지로 채움
+const others = all.filter((e) => e.id !== entry.id);
+const relatedSet = [
+  ...data.related.map((s) => others.find((e) => e.id === s)).filter(Boolean),
+  ...others.filter((e) => !data.related.includes(e.id)),
+].slice(0, 4);
+
+const published = isoDate(data.publishDate);
+const modified = isoDate(data.updatedDate ?? data.publishDate);
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: data.title,
+    description: data.description,
+    inLanguage: 'ko-KR',
+    datePublished: published,
+    dateModified: modified,
+    mainEntityOfPage: url,
+    keywords: data.keywords.join(', '),
+    author: { '@type': 'Organization', name: SITE_NAME },
+    publisher: { '@type': 'Organization', name: SITE_NAME },
+    image: new URL('/og-default.png', Astro.site).href,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: '홈', item: new URL('/', Astro.site).href },
+      { '@type': 'ListItem', position: 2, name: cat.name, item: new URL(`/category/${cat.key}/`, Astro.site).href },
+      { '@type': 'ListItem', position: 3, name: data.title, item: url },
+    ],
+  },
+];
+if (products.length) {
+  jsonLd.push({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `${data.title} - 추천 상품`,
+    numberOfItems: products.length,
+    itemListElement: products.map((p, i) => ({ '@type': 'ListItem', position: i + 1, name: p.name, url: p.coupangUrl })),
+  });
+}
+---
+<BaseLayout title={data.title} description={data.description} type="article" jsonLd={jsonLd} current={data.category} publishedTime={published} modifiedTime={modified}>
+  <article>
+    <p class="crumbs"><a href="/">홈</a> › <a href={`/category/${cat.key}/`}>{cat.name}</a></p>
+    <h1>{data.title}</h1>
+    <p class="meta">
+      {data.updatedDate ? `업데이트 ${formatDate(data.updatedDate)}` : `작성 ${formatDate(data.publishDate)}`}
+    </p>
+    {products.length > 0 && <Disclosure />}
+    {headings.length > 2 && (
+      <nav class="toc" aria-label="목차">
+        <strong>목차</strong>
+        <ol>{headings.map((h) => <li><a href={`#${h.slug}`}>{h.text}</a></li>)}</ol>
+      </nav>
+    )}
+    <Fragment set:html={before} />
+    <ProductList products={products} showHeading={!html.includes(MARK)} />
+    {after && <Fragment set:html={after} />}
+  </article>
+
+  <section aria-labelledby="more">
+    <h2 id="more">함께 읽으면 좋은 글</h2>
+    <div class="cards">{relatedSet.map((e) => <ArticleCard entry={e} />)}</div>
+    <p><a href={`/category/${cat.key}/`}>{cat.name} 글 모두 보기 →</a></p>
+  </section>
+</BaseLayout>

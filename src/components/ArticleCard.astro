@@ -1,0 +1,11 @@
+---
+import { categoryByKey } from '../data/categories.mjs';
+interface Props { entry: any }
+const { entry } = Astro.props;
+const cat = categoryByKey(entry.data.category);
+---
+<a class="card" href={`/articles/${entry.id}/`}>
+  <span class="tag">{cat?.emoji} {cat?.name}</span>
+  <strong>{entry.data.title}</strong>
+  <span class="d">{entry.data.description}</span>
+</a>

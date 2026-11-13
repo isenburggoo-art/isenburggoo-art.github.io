@@ -1,0 +1,29 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import { CATEGORIES } from '../data/categories.mjs';
+import { SITE_NAME, SITE_DESCRIPTION } from '../site.config.mjs';
+
+const all = (await getCollection('articles', ({ data }) => !data.draft))
+  .sort((a, b) => +b.data.publishDate - +a.data.publishDate);
+const home = new URL('/', Astro.site).href;
+const jsonLd = [
+  { '@context': 'https://schema.org', '@type': 'WebSite', name: SITE_NAME, url: home, inLanguage: 'ko-KR', description: SITE_DESCRIPTION },
+  {
+    '@context': 'https://schema.org', '@type': 'ItemList', name: '최신 육아용품 가이드',
+    itemListElement: all.map((e, i) => ({ '@type': 'ListItem', position: i + 1, url: new URL(`/articles/${e.id}/`, Astro.site).href, name: e.data.title })),
+  },
+];
+---
+<BaseLayout title={`${SITE_NAME} - 월령별 육아용품 추천·비교 가이드`} description={SITE_DESCRIPTION} jsonLd={jsonLd}>
+  <section class="hero">
+    <h1>우리 아이 월령에 맞는 육아템, 기준부터 알고 고르세요</h1>
+    <p>광고 문구 대신 “무엇을 보고 골라야 하는지”를 먼저 정리합니다. 비교표와 체크리스트로 필요한 것만 사세요.</p>
+  </section>
+  <div class="chips">
+    {CATEGORIES.map((c) => <a href={`/category/${c.key}/`}>{c.emoji} {c.name}{c.key !== 'guide' && ` ${c.range}`}</a>)}
+  </div>
+  <h2>겨울 육아 가이드 (최신 글)</h2>
+  <div class="cards">{all.map((e) => <ArticleCard entry={e} />)}</div>
+</BaseLayout>

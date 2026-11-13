@@ -1,0 +1,35 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import { CATEGORIES } from '../../data/categories.mjs';
+
+export async function getStaticPaths() {
+  const all = await getCollection('articles', ({ data }) => !data.draft);
+  return CATEGORIES.map((c) => ({ params: { cat: c.key }, props: { cat: c, all } }));
+}
+const { cat, all } = Astro.props;
+const list = all
+  .filter((e) => e.data.category === cat.key || e.data.ages.includes(cat.key))
+  .sort((a, b) => +b.data.publishDate - +a.data.publishDate);
+const title = cat.key === 'guide' ? '육아용품 비교·구매 가이드' : `${cat.name}(${cat.range}) 육아용품 추천`;
+const jsonLd = [{
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: title,
+  itemListElement: list.map((e, i) => ({ '@type': 'ListItem', position: i + 1, url: new URL(`/articles/${e.id}/`, Astro.site).href, name: e.data.title })),
+}];
+---
+<BaseLayout title={title} description={cat.description} jsonLd={jsonLd} current={cat.key}>
+  <p class="crumbs"><a href="/">홈</a> › {cat.name}</p>
+  <h1>{cat.emoji} {title}</h1>
+  <p class="lead">{cat.description}</p>
+  {list.length > 0 ? (
+    <div class="cards">{list.map((e) => <ArticleCard entry={e} />)}</div>
+  ) : (
+    <>
+      <p>이 월령의 글을 준비하고 있어요. 그동안 아래 글을 먼저 확인해 보세요.</p>
+      <div class="cards">{all.slice(0, 4).map((e) => <ArticleCard entry={e} />)}</div>
+    </>
+  )}
+</BaseLayout>

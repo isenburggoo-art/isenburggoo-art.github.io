@@ -1,0 +1,22 @@
+---
+import { buyUrl } from '../lib.mjs';
+interface Props { products: any[]; heading?: string; showHeading?: boolean }
+// showHeading=false: 본문에 이미 '추천 ...' 소제목이 있을 때(<!-- products --> 마커 사용 시) 중복 h2 생략
+const { products, heading = '추천 상품', showHeading = true } = Astro.props;
+---
+{products.length > 0 && (
+  <section aria-label={heading} id="picks">
+    {showHeading && <h2>{heading}</h2>}
+    <div class="products">
+      {products.map((p, i) => (
+        <article class="product">
+          <span class="rank">추천 {i + 1}</span>
+          <h3>{p.name}</h3>
+          {p.highlight && <p>{p.highlight}</p>}
+          <a class="btn" href={buyUrl(p)} target="_blank" rel="sponsored nofollow noopener">쿠팡에서 가격 확인 →</a>
+        </article>
+      ))}
+    </div>
+    <p class="note">가격·재고·옵션은 수시로 바뀌므로 구매 전 쿠팡 상품 페이지에서 확인하세요.</p>
+  </section>
+)}
